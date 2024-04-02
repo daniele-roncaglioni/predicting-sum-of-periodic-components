@@ -10,7 +10,120 @@ import random
 import string
 from datetime import datetime
 
+
 # np.random.seed(0)  # Seed for reproducibility
+
+def generate_dynamic_signal(num_samples=118, num_components=5, periods_range=(20, 100), sigma_factor=0.3):
+    """
+    Generate a signal composed of multiple components, where each component's
+    period is resampled after completing a cycle, based on a Gaussian distribution.
+
+    :param num_samples: Total number of samples in the signal.
+    :param num_components: Number of sinusoidal components to generate.
+    :param initial_periods_range: Range of initial period lengths for the sinusoidal components.
+    :param sigma_factor: Factor to calculate sigma for Gaussian distribution, relative to the period.
+    :return: Sample indices and the generated signal as PyTorch tensors.
+    """
+    # Initialize the signal
+    signal = np.zeros(num_samples)
+
+    # Sample indices
+    samples = np.arange(num_samples)
+
+    for i in range(num_components):
+        # Initial period, amplitude, and phase for the component
+        period = np.random.randint(*periods_range)
+        amplitude = np.random.rand()
+        phase = np.random.rand() * 2 * np.pi
+
+        current_sample = 0
+        while current_sample < num_samples:
+            # Calculate the end of the current period within the total samples
+            period_end_sample = min(current_sample + period - int((phase / (2 * np.pi) * period) % period), num_samples)
+            period_samples = np.arange(
+                period_end_sample - current_sample
+            )
+
+            # Generate the component signal for the current period
+            component_signal = amplitude * np.sin(2 * np.pi * (1 / period) * period_samples + phase)
+
+            # Add the current component signal to the total signal
+            signal[current_sample:period_end_sample] += component_signal
+
+            # Update the current sample pointer
+            current_sample = period_end_sample
+
+            # Resample the period for the next cycle
+            sigma = period * sigma_factor  # Standard deviation for Gaussian distribution
+            period = int(np.random.normal(period, sigma))
+            period = max(periods_range[0],
+                         min(period, periods_range[1]))  # Ensure the new period is within a reasonable range
+            phase = 0
+
+    # Normalize the signal
+    signal = signal / np.max(np.abs(signal))
+
+    return torch.from_numpy(samples).to(torch.float), torch.from_numpy(signal).to(torch.float)
+
+
+def generate_signal_with_drift(num_samples=118, noise=False, num_components=(3, 7), periods_range=(2, 100),
+                               freq_drift_rate=1, amp_drift_rate=1):
+    """
+    :param num_samples: Total number of samples in the signal.
+    :param noise: Whether to add Gaussian noise to the signal.
+    :param num_components: Range of number of sinusoidal components to generate.
+    :param periods_range: Range of period lengths for the sinusoidal components.
+    :param freq_drift_rate: Rate of frequency drift (proportion of change per sample).
+    :param amp_drift_rate: Rate of amplitude drift (proportion of change per sample).
+    :return: Sample indices and the generated signal as PyTorch tensors.
+    """
+    if type(num_components) == int:
+        num_components = (num_components, num_components + 1)
+    else:
+        assert num_components[0] < num_components[1]
+
+    if type(periods_range) == int:
+        periods_range = (periods_range, periods_range + 1)
+    else:
+        assert periods_range[0] <= periods_range[1]
+
+    # Randomly choose how many components to combine
+    num_components = np.random.randint(*num_components)
+
+    # Initial period lengths in samples and initial phases
+    periods = np.random.randint(*periods_range, num_components)
+    phases = np.random.rand(num_components) * 2 * np.pi
+    amplitudes = np.random.rand(num_components)
+    amplitudes /= np.sum(amplitudes)  # Normalize amplitudes
+
+    # Sample indices
+    samples = np.arange(num_samples)
+
+    # Initialize signal
+    signal = np.zeros(num_samples)
+
+    # Generate signal with drifting frequencies and amplitudes
+    for amplitude, period, phase in zip(amplitudes, periods, phases):
+        # Drift calculations: Linear drift can be replaced with any function of your choice
+        freq_drift = 1 + freq_drift_rate * np.linspace(-0.5, 0.5, num_samples)
+        amp_drift = 1 + amp_drift_rate * np.linspace(-0.5, 0.5, num_samples)
+
+        period_samples = (1 / period) * freq_drift  # Apply frequency drift
+        amplitude_samples = amplitude * amp_drift  # Apply amplitude drift
+
+        component_signal = amplitude_samples * np.sin(2 * np.pi * period_samples * samples + phase)
+        signal += component_signal
+
+    # Normalize signal
+    signal = signal / np.max(np.abs(signal))
+
+    # Add random noise to the signal
+    if noise:
+        noise_level = np.random.normal(0, 0.1, signal.shape)
+        signal += noise_level
+        signal = signal / np.max(np.abs(signal))  # Normalize signal again
+
+    return torch.from_numpy(samples).to(torch.float), torch.from_numpy(signal).to(torch.float)
 
 
 def generate_signal(num_samples=118, noise=False, num_components=(3, 7), periods_range=(2, 100)):
@@ -138,19 +251,21 @@ def plot_signal_and_fft(signal: torch.Tensor, train_test_split_idx: int, hamming
     plt.show()
 
 
-def plot_predictions(model, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE):
+def plot_predictions(model, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE, noise=False):
     def lstm_pred(signal, N):
         signal = torch.clone(signal)
         pred = model(signal[:N].view(1, N, 1))
         return pred.view(SIGNAL_SIZE - N).detach()
+
     predictions_amount = 10
     fig, axes = plt.subplots(predictions_amount, figsize=(15, 15))
     for ax in axes:
-        t, signal = generate_signal(num_samples=SIGNAL_SIZE, periods_range=(2, 100))
+        # t, signal = generate_signal(num_samples=SIGNAL_SIZE, periods_range=(2, 100), noise=noise)
+        t, signal = generate_signal_with_drift(num_samples=SIGNAL_SIZE, periods_range=(2, 100), noise=noise)
 
         ax.plot(t, signal, label='input')
         ax.plot(range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), lstm_pred(signal, LOOKBACK_WINDOW_SIZE), '-x',
-                 label='lstm predicted')
+                label='lstm predicted')
         ax.legend(loc='best')
         ax.set_xlabel('Samples')
         ax.set_ylabel('Amplitude')
@@ -267,3 +382,11 @@ def train(
             if i % 100 == 0:
                 torch.save(model.state_dict(),
                            f"{logger.new_checkpoint_dir}/{i}_epochs")
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    samples, y = generate_dynamic_signal(num_components=1)
+    plt.plot(samples, y, 'x')
+    plt.show()

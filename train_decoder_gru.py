@@ -2,7 +2,7 @@
 import torch
 from torch.utils.data import Dataset
 
-from utils import generate_signal, count_parameters, Logger, train
+from utils import generate_signal, count_parameters, Logger, train, generate_signal_with_drift
 
 
 class SeqToSeqDataset(Dataset):
@@ -18,7 +18,8 @@ class SeqToSeqDataset(Dataset):
         return self.size
 
     def __getitem__(self, idx):
-        _, signal = generate_signal(num_samples=self.num_samples, periods_range=(2, self.max_period))
+        _, signal = generate_signal_with_drift(num_samples=self.num_samples, noise=True,
+                                               periods_range=(2, self.max_period))
         encoder_input = signal[:self.split_idx]
         decoder_input = signal[self.split_idx - 1:]
         decoder_targets = torch.roll(decoder_input, -1, dims=0)
@@ -113,7 +114,7 @@ if __name__ == '__main__':
     PREDICTION_SIZE = 20
     assert LOOKBACK_WINDOW_SIZE + PREDICTION_SIZE == SIGNAL_SIZE
     EPOCH_FROM = 0
-    EPOCH_TO = 500
+    EPOCH_TO = 2000
     SEND_TO_WANDB = True
 
     #### BEGIN: Load model and init Logger
