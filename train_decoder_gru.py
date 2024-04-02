@@ -2,7 +2,8 @@
 import torch
 from torch.utils.data import Dataset
 
-from utils import generate_signal, count_parameters, Logger, train, generate_signal_with_drift
+from utils import generate_signal, count_parameters, Logger, train, \
+    generate_signal_with_amplitude_mod
 
 
 class SeqToSeqDataset(Dataset):
@@ -18,8 +19,8 @@ class SeqToSeqDataset(Dataset):
         return self.size
 
     def __getitem__(self, idx):
-        _, signal = generate_signal_with_drift(num_samples=self.num_samples, noise=True,
-                                               periods_range=(2, self.max_period))
+        _, signal = generate_signal_with_amplitude_mod(num_samples=self.num_samples, noise=True,
+                                                       periods_range=(2, self.max_period))
         encoder_input = signal[:self.split_idx]
         decoder_input = signal[self.split_idx - 1:]
         decoder_targets = torch.roll(decoder_input, -1, dims=0)
@@ -123,7 +124,7 @@ if __name__ == '__main__':
     # checkpoint_path = './checkpoints/M3BBAG/02-04-2024_14-41-40/6000_epochs'
     checkpoint_path = None
 
-    hyperparameters = [f"LR={LR}", f"PARAMS={count_parameters(model)}", f"SIGNAL_SIZE={SIGNAL_SIZE}",
+    hyperparameters = ["amplitude mod", f"LR={LR}", f"PARAMS={count_parameters(model)}", f"SIGNAL_SIZE={SIGNAL_SIZE}",
                        f"LOOKBACK_WINDOW_SIZE={LOOKBACK_WINDOW_SIZE}", f"PREDICTION_SIZE={PREDICTION_SIZE}"]
 
     if checkpoint_path:
