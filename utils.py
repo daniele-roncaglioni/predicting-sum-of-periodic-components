@@ -65,7 +65,7 @@ def generate_signal_with_amplitude_mod(num_samples=118, noise=False, num_compone
 
     # Add random noise
     if noise:
-        noise_level = np.random.normal(0, 0.1, signal.shape)
+        noise_level = np.random.normal(0, 0.05, signal.shape)
         signal += noise_level
         signal = signal / np.max(np.abs(signal))  # Normalize signal again
 

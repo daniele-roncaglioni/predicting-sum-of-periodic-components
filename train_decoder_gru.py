@@ -19,8 +19,8 @@ class SeqToSeqDataset(Dataset):
         return self.size
 
     def __getitem__(self, idx):
-        _, signal = generate_signal_with_amplitude_mod(num_samples=self.num_samples, noise=True,
-                                                       periods_range=(2, self.max_period))
+        _, signal = generate_signal_with_amplitude_mod(num_samples=self.num_samples, noise=True, num_components_range=(25, 55),
+                                                       periods_range=(20, self.max_period))
         encoder_input = signal[:self.split_idx]
         decoder_input = signal[self.split_idx - 1:]
         decoder_targets = torch.roll(decoder_input, -1, dims=0)
@@ -67,7 +67,7 @@ class SeqToSeqGru(torch.nn.Module):
         self.encoder_in_dim = encoder_input_length
         self.decoder_in_dim = decoder_input_length
 
-        self.decoder_hidden_dim = 100
+        self.decoder_hidden_dim = 200
         self.signal_plus_dft_dim = self.encoder_in_dim + 2 * (
                 int(self.encoder_in_dim / 2) + 1)  # hidden dim + cat 2 * rfft
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     PREDICTION_SIZE = 20
     assert LOOKBACK_WINDOW_SIZE + PREDICTION_SIZE == SIGNAL_SIZE
     EPOCH_FROM = 0
-    EPOCH_TO = 2000
+    EPOCH_TO = 3000
     SEND_TO_WANDB = True
 
     #### BEGIN: Load model and init Logger
@@ -131,10 +131,10 @@ if __name__ == '__main__':
         EPOCH_FROM = int(checkpoint_path.split("/")[-1].split("_")[0])
         run_id = checkpoint_path.split("/")[-3]
         model.load_state_dict(torch.load(checkpoint_path))
-        logger = Logger("enocder-decoder-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
+        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
                         hyperparameters=hyperparameters)
     else:
-        logger = Logger("enocder-decoder-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
+        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
     ### END
 
     loss_function = torch.nn.MSELoss()

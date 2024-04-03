@@ -6,8 +6,8 @@ from utils import plot_predictions
 import pandas as pd
 
 model = SeqToSeqGru(encoder_input_length=100, decoder_input_length=20)
-# model.load_state_dict(torch.load('./checkpoints/69ua59z5/02-04-2024_23-58-32/1100_epochs'))
-model.load_state_dict(torch.load('./checkpoints/55ma169j/02-04-2024_17-35-11/1000_epochs'))
+model.load_state_dict(torch.load('./checkpoints/69ua59z5/02-04-2024_23-58-32/1100_epochs'))
+# model.load_state_dict(torch.load('./checkpoints/55ma169j/02-04-2024_17-35-11/1000_epochs'))
 
 # plot_predictions(model, 120, 100, noise=True)
 
@@ -21,7 +21,7 @@ df = pd.read_csv(csv_file)
 column_data = df[column_name].to_numpy()
 
 # Convert the NumPy array to a PyTorch tensor
-n = 598
+n = 211
 targets = torch.tensor(column_data, dtype=torch.float32)[n:n + 120]  # or torch.float64 for double precision
 targets = (targets - torch.mean(targets))
 targets = targets / torch.max(torch.abs(targets))
