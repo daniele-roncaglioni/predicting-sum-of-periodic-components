@@ -19,7 +19,8 @@ class SeqToSeqDataset(Dataset):
         return self.size
 
     def __getitem__(self, idx):
-        _, signal = generate_signal_with_amplitude_mod(num_samples=self.num_samples, noise=True, num_components_range=(25, 55),
+        _, signal = generate_signal_with_amplitude_mod(num_samples=self.num_samples, noise=True,
+                                                       num_components_range=(25, 55),
                                                        periods_range=(20, self.max_period))
         encoder_input = signal[:self.split_idx]
         decoder_input = signal[self.split_idx - 1:]
@@ -131,10 +132,10 @@ if __name__ == '__main__':
         EPOCH_FROM = int(checkpoint_path.split("/")[-1].split("_")[0])
         run_id = checkpoint_path.split("/")[-3]
         model.load_state_dict(torch.load(checkpoint_path))
-        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
+        logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
                         hyperparameters=hyperparameters)
     else:
-        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
+        logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
     ### END
 
     loss_function = torch.nn.MSELoss()

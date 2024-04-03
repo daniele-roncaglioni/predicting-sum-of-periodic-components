@@ -296,6 +296,7 @@ def train(
         epochs_to=500,
         device='cpu',
         bs=32,
+        save_freq=100
 ):
     print("DEVICE", device)
     model.to(device)
@@ -325,9 +326,9 @@ def train(
             print(f'VAL: epoch: {i},  val loss: {val_loss.item()} \n')
             logger.log({"train loss": train_loss.item(),
                         "val loss": val_loss.item()}, i)
-            if i % 100 == 0:
-                torch.save(model.state_dict(),
-                           f"{logger.new_checkpoint_dir}/{i}_epochs")
+        if i % save_freq == 0:
+            torch.save(model.state_dict(),
+                       f"{logger.new_checkpoint_dir}/{i}_epochs")
 
 
 if __name__ == '__main__':
