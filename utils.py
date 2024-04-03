@@ -72,7 +72,7 @@ def generate_signal_with_amplitude_mod(num_samples=118, noise=False, num_compone
     return torch.from_numpy(samples).float(), torch.from_numpy(signal).float()
 
 
-def generate_signal(num_samples=118, noise=False, num_components=(3, 7), periods_range=(2, 100)):
+def generate_signal(num_samples, noise=False, num_components=(3, 7), periods_range=(10, 100)):
     """
     :param num_samples: Total number of samples in the signal
     :return: 
@@ -197,29 +197,31 @@ def plot_signal_and_fft(signal: torch.Tensor, train_test_split_idx: int, hamming
     plt.show()
 
 
-def plot_predictions(model, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE, noise=False):
-    def lstm_pred(signal, N):
-        signal = torch.clone(signal)
-        pred = model(signal[:N].view(1, N, 1))
-        return pred.view(SIGNAL_SIZE - N).detach()
-
+def plot_predictions(models, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE, noise=False):
     predictions_amount = 10
-    fig, axes = plt.subplots(predictions_amount, figsize=(15, 15))
-    for ax in axes:
-        # t, signal = generate_signal(num_samples=SIGNAL_SIZE, periods_range=(2, 100), noise=noise)
-        t, signal = generate_signal_with_amplitude_mod(num_samples=SIGNAL_SIZE, periods_range=(2, 100), noise=noise)
+    signals = [generate_signal(num_samples=SIGNAL_SIZE, noise=noise) for _ in range(predictions_amount)]
+    np.random.seed(42)
+    for j, model in enumerate(models):
+        def lstm_pred(signal, N, model):
+            signal = torch.clone(signal)
+            pred = model(signal[:N].view(1, N, 1))
+            return pred.view(SIGNAL_SIZE - N).detach()
 
-        ax.plot(t, signal, label='input')
-        ax.plot(range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), lstm_pred(signal, LOOKBACK_WINDOW_SIZE), '-x',
-                label='lstm predicted')
-        ax.legend(loc='best')
-        ax.set_xlabel('Samples')
-        ax.set_ylabel('Amplitude')
+        fig, axes = plt.subplots(predictions_amount, figsize=(15, 30))
+        for i, ax in enumerate(axes):
+            ax.plot(*signals[i], label='input')
+            ax.plot(range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), lstm_pred(signals[i][1], LOOKBACK_WINDOW_SIZE, model),
+                    '-x',
+                    label='lstm predicted')
+            ax.legend(loc='best')
+            ax.set_xlabel('Samples')
+            ax.set_ylabel('Amplitude')
 
-        ax.axvspan(0, LOOKBACK_WINDOW_SIZE - 1, color='grey', alpha=0.3)
+            ax.axvspan(0, LOOKBACK_WINDOW_SIZE - 1, color='grey', alpha=0.3)
 
-    fig.tight_layout()
-    fig.show()
+        fig.suptitle(f'Model {j}', fontsize=16)
+        fig.tight_layout()
+        fig.show()
 
 
 class Logger:

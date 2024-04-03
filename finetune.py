@@ -40,17 +40,17 @@ class RealDataset(Dataset):
 
 if __name__ == '__main__':
     LR = 0.00001
-    SIGNAL_SIZE = 120
+    SIGNAL_SIZE = 110
     LOOKBACK_WINDOW_SIZE = 100
-    PREDICTION_SIZE = 20
+    PREDICTION_SIZE = 10
     assert LOOKBACK_WINDOW_SIZE + PREDICTION_SIZE == SIGNAL_SIZE
     EPOCH_FROM = 0
-    EPOCH_TO = 3000
+    EPOCH_TO = 1000
     SEND_TO_WANDB = True
 
     #### BEGIN: Load model and init Logger
     model = SeqToSeqGru(encoder_input_length=LOOKBACK_WINDOW_SIZE, decoder_input_length=PREDICTION_SIZE)
-    model.load_state_dict(torch.load('./checkpoints/mbrueco8/03-04-2024_11-42-54/900_epochs'))
+    model.load_state_dict(torch.load('././checkpoints/faab98ah/03-04-2024_15-46-05/1700_epochs'))
 
     # checkpoint_path = './checkpoints/M3BBAG/02-04-2024_14-41-40/6000_epochs'
     checkpoint_path = None
@@ -62,16 +62,16 @@ if __name__ == '__main__':
         EPOCH_FROM = int(checkpoint_path.split("/")[-1].split("_")[0])
         run_id = checkpoint_path.split("/")[-3]
         model.load_state_dict(torch.load(checkpoint_path))
-        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
+        logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
                         hyperparameters=hyperparameters)
     else:
-        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
+        logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
     ### END
 
     loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    train_dataset = RealDataset(start_idx=0, end_idx=500, lookback_window_size=100, prediction_size=20)
-    eval_dataset = RealDataset(start_idx=500, end_idx=768-1, lookback_window_size=100, prediction_size=20)
+    train_dataset = RealDataset(start_idx=0, end_idx=500, lookback_window_size=100, prediction_size=10)
+    eval_dataset = RealDataset(start_idx=500, end_idx=768-1, lookback_window_size=100, prediction_size=10)
 
     assert EPOCH_TO > EPOCH_FROM
     print(f"Training from {EPOCH_FROM} to {EPOCH_TO}")
