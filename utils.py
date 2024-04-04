@@ -218,7 +218,7 @@ def plot_predictions(models):
         for _ in range(predictions_amount)
     ]
     for j, model in enumerate(models):
-        def lstm_pred(signal, N, model):
+        def gru_pred(signal, N, model):
             signal = torch.clone(signal)
             pred = model(signal[:N].view(1, N, 1))
             return pred.view(SIGNAL_SIZE - N).detach()
@@ -227,9 +227,9 @@ def plot_predictions(models):
         for i, ax in enumerate(axes):
             ax.plot(*signals[i], label='input')
             ax.plot(
-                range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), lstm_pred(signals[i][1], LOOKBACK_WINDOW_SIZE, model),
+                range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), gru_pred(signals[i][1], LOOKBACK_WINDOW_SIZE, model),
                 '-x',
-                label='lstm predicted'
+                label='gru predicted'
             )
             ax.legend(loc='best')
             ax.set_xlabel('Samples')

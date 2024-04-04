@@ -39,7 +39,7 @@ class RealDataset(Dataset):
 
 
 if __name__ == '__main__':
-    LR = 0.00001
+    LR = 0.000001
     SIGNAL_SIZE = 110
     LOOKBACK_WINDOW_SIZE = 100
     PREDICTION_SIZE = 10
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     #### BEGIN: Load model and init Logger
     model = SeqToSeqGru(encoder_input_length=LOOKBACK_WINDOW_SIZE, decoder_input_length=PREDICTION_SIZE, decoder_hidden_dim=140)
-    model.load_state_dict(torch.load('./checkpoints/04-Apr-2024_14-25-34_r46ycq3s/2600_epochs'))
+    model.load_state_dict(torch.load('./checkpoints/04-Apr-2024_16-50-22_8drs2gg8/17500_epochs'))
 
     # checkpoint_path = './checkpoints/M3BBAG/02-04-2024_14-41-40/6000_epochs'
     checkpoint_path = None
@@ -62,16 +62,18 @@ if __name__ == '__main__':
         EPOCH_FROM = int(checkpoint_path.split("/")[-1].split("_")[0])
         run_id = checkpoint_path.split("/")[-3]
         model.load_state_dict(torch.load(checkpoint_path))
-        logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
-                        hyperparameters=hyperparameters)
+        logger = Logger(
+            "finetune (3,45)", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
+            hyperparameters=hyperparameters
+            )
     else:
-        logger = Logger("finetune (3,10)", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
+        logger = Logger("finetune (3,45)", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
     ### END
 
     loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     train_dataset = RealDataset(start_idx=0, end_idx=500, lookback_window_size=100, prediction_size=10)
-    eval_dataset = RealDataset(start_idx=500, end_idx=768-1, lookback_window_size=100, prediction_size=10)
+    eval_dataset = RealDataset(start_idx=500, end_idx=768 - 1, lookback_window_size=100, prediction_size=10)
 
     assert EPOCH_TO > EPOCH_FROM
     print(f"Training from {EPOCH_FROM} to {EPOCH_TO}")
