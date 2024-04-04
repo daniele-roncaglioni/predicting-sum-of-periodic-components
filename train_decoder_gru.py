@@ -2,25 +2,30 @@
 import torch
 from torch.utils.data import Dataset
 
+from run_config import LOOKBACK_WINDOW_SIZE, PREDICTION_SIZE, SIGNAL_SIZE, NUM_COMPONENTS_RANGE, PERIODS_RANGE, NOISE
 from utils import generate_signal, count_parameters, Logger, train, \
     generate_signal_with_amplitude_mod
 
 
 class SeqToSeqDataset(Dataset):
-    def __init__(self, size, num_samples=150, split_idx=100, max_period=100, return_decoder_input=True):
+    def __init__(self, size, num_samples, split_idx, num_components, periods_range, noise, return_decoder_input=True):
         assert num_samples > split_idx
         self.size = size
         self.num_samples = num_samples
         self.split_idx = split_idx
-        self.max_period = max_period
+        self.periods_range = periods_range
+        self.num_components = num_components
+        self.noise = noise
         self.return_decoder_input = return_decoder_input
 
     def __len__(self):
         return self.size
 
     def __getitem__(self, idx):
-        # _, signal = generate_signal_with_amplitude_mod(num_samples=self.num_samples, noise=True)
-        _, signal = generate_signal(num_samples=self.num_samples, noise=True)
+        _, signal = generate_signal(
+            num_samples=self.num_samples, num_components=self.num_components,
+            periods_range=self.periods_range, noise=self.noise
+        )
         encoder_input = signal[:self.split_idx]
         decoder_input = signal[self.split_idx - 1:]
         decoder_targets = torch.roll(decoder_input, -1, dims=0)
@@ -75,8 +80,10 @@ class SeqToSeqGru(torch.nn.Module):
         self.signal_plus_dft_dim = self.encoder_in_dim + 2 * (
                 int(self.encoder_in_dim / 2) + 1)  # hidden dim + cat 2 * rfft
 
-        self.encoder = MLPEncoder(signal_plus_dft_dim=self.signal_plus_dft_dim,
-                                  decoder_hidden_dim=self.decoder_hidden_dim)
+        self.encoder = MLPEncoder(
+            signal_plus_dft_dim=self.signal_plus_dft_dim,
+            decoder_hidden_dim=self.decoder_hidden_dim
+        )
         self.decoder_cell = GruDecoderCell(hidden_size=self.decoder_hidden_dim)
         self.leaky_relu = torch.nn.LeakyReLU()
         self.linear_1 = torch.nn.Linear(self.decoder_hidden_dim, int(self.decoder_hidden_dim / 2))
@@ -114,34 +121,40 @@ class SeqToSeqGru(torch.nn.Module):
 
 
 if __name__ == '__main__':
-    LR = 0.001
-    SIGNAL_SIZE = 110
-    LOOKBACK_WINDOW_SIZE = 100
-    PREDICTION_SIZE = 10
-    assert LOOKBACK_WINDOW_SIZE + PREDICTION_SIZE == SIGNAL_SIZE
-    EPOCH_FROM = 0
-    EPOCH_TO = 2000
+    LR = 0.0001
+    EPOCH_FROM = 9000
+    EPOCH_TO = 18000
     SEND_TO_WANDB = True
 
     #### BEGIN: Load model and init Logger
-    model = SeqToSeqGru(encoder_input_length=LOOKBACK_WINDOW_SIZE, decoder_input_length=PREDICTION_SIZE,
-                        decoder_hidden_dim=400)
+    model = SeqToSeqGru(
+        encoder_input_length=LOOKBACK_WINDOW_SIZE, decoder_input_length=PREDICTION_SIZE,
+        decoder_hidden_dim=140
+    )
 
-    # checkpoint_path = './checkpoints/M3BBAG/02-04-2024_14-41-40/6000_epochs'
-    checkpoint_path = None
+    resume_path = 'checkpoints/04-Apr-2024_15-51-32_8drs2gg8/9000_epochs'
+    # resume_path = None
 
-    hyperparameters = ["NO amplitude mod", f"LR={LR}", f"PARAMS={count_parameters(model)}",
-                       f"SIGNAL_SIZE={SIGNAL_SIZE}",
-                       f"LOOKBACK_WINDOW_SIZE={LOOKBACK_WINDOW_SIZE}", f"PREDICTION_SIZE={PREDICTION_SIZE}"]
+    # load_checkpoint_path = 'checkpoints/04-Apr-2024_14-25-34_r46ycq3s/2600_epochs'
+    load_checkpoint_path = None
 
-    if checkpoint_path:
-        EPOCH_FROM = int(checkpoint_path.split("/")[-1].split("_")[0])
-        run_id = checkpoint_path.split("/")[-3]
-        model.load_state_dict(torch.load(checkpoint_path))
-        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
-                        hyperparameters=hyperparameters)
+    hyperparameters = ["no amplitude mod, no pre training", f"LR={LR}", f"PARAMS={count_parameters(model)}",
+                       f"SIGNAL_SIZE={SIGNAL_SIZE}", f"LOOKBACK_WINDOW_SIZE={LOOKBACK_WINDOW_SIZE}",
+                       f"PREDICTION_SIZE={PREDICTION_SIZE}", f"NUM_COMPS={NUM_COMPONENTS_RANGE}",
+                       f"PERIODS_RANGE={PERIODS_RANGE}", f"NOISE={NOISE}"]
+
+    if resume_path:
+        EPOCH_FROM = int(resume_path.split("/")[-1].split("_")[0])
+        run_id = resume_path.split("/")[-2].split("_")[-1]
+        model.load_state_dict(torch.load(resume_path))
+        logger = Logger(
+            "decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
+            hyperparameters=hyperparameters
+        )
     else:
-        logger = Logger("decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
+        if load_checkpoint_path:
+            model.load_state_dict(torch.load(load_checkpoint_path))
+        logger = Logger("(3,45) on (3,10)", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
 
 
     ### END
@@ -152,10 +165,16 @@ if __name__ == '__main__':
 
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    train_dataset = SeqToSeqDataset(size=1000, num_samples=SIGNAL_SIZE, split_idx=LOOKBACK_WINDOW_SIZE,
-                                    return_decoder_input=True)
-    eval_dataset = SeqToSeqDataset(size=1000, num_samples=SIGNAL_SIZE, split_idx=LOOKBACK_WINDOW_SIZE,
-                                   return_decoder_input=False)
+    train_dataset = SeqToSeqDataset(
+        size=1000, num_samples=SIGNAL_SIZE, split_idx=LOOKBACK_WINDOW_SIZE,
+        num_components=NUM_COMPONENTS_RANGE, periods_range=PERIODS_RANGE, noise=NOISE,
+        return_decoder_input=True
+    )
+    eval_dataset = SeqToSeqDataset(
+        size=1000, num_samples=SIGNAL_SIZE, split_idx=LOOKBACK_WINDOW_SIZE,
+        num_components=NUM_COMPONENTS_RANGE, periods_range=PERIODS_RANGE, noise=NOISE,
+        return_decoder_input=False
+    )
 
     assert EPOCH_TO > EPOCH_FROM
     print(f"Training from {EPOCH_FROM} to {EPOCH_TO}")
@@ -168,6 +187,7 @@ if __name__ == '__main__':
         epochs_from=EPOCH_FROM,
         epochs_to=EPOCH_TO,
         loss_function=loss_function,
-        logger=logger
+        logger=logger,
+        bs=128
     )
     logger.finish()

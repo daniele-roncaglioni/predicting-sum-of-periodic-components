@@ -10,12 +10,15 @@ import random
 import string
 from datetime import datetime
 
+from run_config import NUM_COMPONENTS_RANGE, PERIODS_RANGE, NOISE, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE, PREDICTION_SIZE
+
 
 # np.random.seed(0)  # Seed for reproducibility
 
 
 def generate_signal_with_amplitude_mod(num_samples=118, noise=False, num_components_range=(3, 7),
-                                       periods_range=(2, 100)):
+                                       periods_range=(2, 100)
+                                       ):
     """
     Generates a signal with dynamic frequency and amplitude drift.
 
@@ -72,7 +75,7 @@ def generate_signal_with_amplitude_mod(num_samples=118, noise=False, num_compone
     return torch.from_numpy(samples).float(), torch.from_numpy(signal).float()
 
 
-def generate_signal(num_samples, noise=False, num_components=(3, 7), periods_range=(10, 100)):
+def generate_signal(num_samples, noise, num_components, periods_range):
     """
     :param num_samples: Total number of samples in the signal
     :return: 
@@ -99,8 +102,10 @@ def generate_signal(num_samples, noise=False, num_components=(3, 7), periods_ran
     samples = np.arange(num_samples)
 
     # Generate a random continuous periodic signal
-    signal = sum(amplitude * np.sin(2 * np.pi * (1 / period) * samples + phase)
-                 for amplitude, period, phase in zip(amplitudes, periods, phases))
+    signal = sum(
+        amplitude * np.sin(2 * np.pi * (1 / period) * samples + phase)
+        for amplitude, period, phase in zip(amplitudes, periods, phases)
+    )
     signal = signal / np.max(np.abs(signal))  # Normalize signal
 
     # Add random noise to the signal
@@ -139,8 +144,10 @@ def get_signal_from_harmonics(amplitudes, phases, num_samples):
     reconstructed_signal = torch.zeros(num_samples, dtype=torch.complex64)
     for index, (amplitude, phase) in enumerate(zip(amplitudes, phases)):
         reconstructed_signal += amplitude * \
-                                torch.exp(1j * (2 * torch.pi * index *
-                                                torch.arange(num_samples) / analysis_samples + phase))
+                                torch.exp(
+                                    1j * (2 * torch.pi * index *
+                                          torch.arange(num_samples) / analysis_samples + phase)
+                                )
 
     # Return the real part of the reconstructed signal
     return reconstructed_signal.real
@@ -149,7 +156,8 @@ def get_signal_from_harmonics(amplitudes, phases, num_samples):
 def reconstruct_signal_fft(orignal_signal, analysis_samples, hamming_smoothing=False):
     # Perform FFT on the entire signal
     amplitudes, phases = get_fft_harmonics(
-        orignal_signal, analysis_samples, hamming_smoothing)
+        orignal_signal, analysis_samples, hamming_smoothing
+    )
 
     # Return the real part of the reconstructed signal
     return get_signal_from_harmonics(amplitudes, phases, len(orignal_signal))
@@ -160,15 +168,19 @@ def plot_signal_and_fft(signal: torch.Tensor, train_test_split_idx: int, hamming
     t_full = torch.arange(W)
 
     amplitudes, phases = get_fft_harmonics(
-        signal, train_test_split_idx, hamming_smoothing)
+        signal, train_test_split_idx, hamming_smoothing
+    )
     frequency_bins = np.arange(len(amplitudes), dtype=np.float16)
 
     plt.figure(figsize=(15, 3))
 
     plt.subplot(1, 3, 1)
     plt.plot(t_full, signal, label="original")
-    plt.plot(t_full, get_signal_from_harmonics(
-        amplitudes, phases, W), '-x', label="fft reconstruction")
+    plt.plot(
+        t_full, get_signal_from_harmonics(
+            amplitudes, phases, W
+        ), '-x', label="fft reconstruction"
+    )
     plt.axvspan(0, train_test_split_idx - 1, color='grey', alpha=0.3)
     plt.xlabel('t [samples]')
     plt.legend(loc='best')
@@ -188,8 +200,10 @@ def plot_signal_and_fft(signal: torch.Tensor, train_test_split_idx: int, hamming
     top_5_indices = np.argsort(amplitudes)[-4:]
     top_5_indices[0] = 1
     plt.xscale('log')
-    plt.xticks(frequency_bins[top_5_indices],
-               fft_periods[top_5_indices], rotation=70)
+    plt.xticks(
+        frequency_bins[top_5_indices],
+        fft_periods[top_5_indices], rotation=70
+    )
     plt.xlabel('T [samples]')
     plt.title('Amplitudes')
 
@@ -197,10 +211,12 @@ def plot_signal_and_fft(signal: torch.Tensor, train_test_split_idx: int, hamming
     plt.show()
 
 
-def plot_predictions(models, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE, noise=False):
+def plot_predictions(models):
     predictions_amount = 10
-    signals = [generate_signal(num_samples=SIGNAL_SIZE, noise=noise) for _ in range(predictions_amount)]
-    np.random.seed(42)
+    signals = [
+        generate_signal(num_samples=SIGNAL_SIZE, num_components=NUM_COMPONENTS_RANGE, periods_range=PERIODS_RANGE, noise=NOISE)
+        for _ in range(predictions_amount)
+    ]
     for j, model in enumerate(models):
         def lstm_pred(signal, N, model):
             signal = torch.clone(signal)
@@ -210,16 +226,22 @@ def plot_predictions(models, SIGNAL_SIZE, LOOKBACK_WINDOW_SIZE, noise=False):
         fig, axes = plt.subplots(predictions_amount, figsize=(15, 30))
         for i, ax in enumerate(axes):
             ax.plot(*signals[i], label='input')
-            ax.plot(range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), lstm_pred(signals[i][1], LOOKBACK_WINDOW_SIZE, model),
-                    '-x',
-                    label='lstm predicted')
+            ax.plot(
+                range(LOOKBACK_WINDOW_SIZE, SIGNAL_SIZE), lstm_pred(signals[i][1], LOOKBACK_WINDOW_SIZE, model),
+                '-x',
+                label='lstm predicted'
+            )
             ax.legend(loc='best')
             ax.set_xlabel('Samples')
             ax.set_ylabel('Amplitude')
 
             ax.axvspan(0, LOOKBACK_WINDOW_SIZE - 1, color='grey', alpha=0.3)
 
-        fig.suptitle(f'Model {j}', fontsize=16)
+        fig.suptitle(
+            f'Model {j}, LOOKBACK={LOOKBACK_WINDOW_SIZE}, PRED={PREDICTION_SIZE}, NUM_COMPONENTS={NUM_COMPONENTS_RANGE}, '
+            f'PERIODS_RANGE={PERIODS_RANGE}, NOISE={NOISE}',
+            fontsize=16
+        )
         fig.tight_layout()
         fig.show()
 
@@ -248,20 +270,24 @@ class Logger:
         if not send_to_wandb and id_resume:
             self.run_id = id_resume
         elif not send_to_wandb:
-            self.run_id = ''.join(random.choices(
-                string.ascii_uppercase + string.digits, k=6))
+            self.run_id = ''.join(
+                random.choices(
+                    string.ascii_uppercase + string.digits, k=6
+                )
+            )
 
         print("RUN ID", self.run_id)
         self.send_to_wandb = send_to_wandb
 
-        base_dir = Path(f"./checkpoints/{self.run_id}/")
-        base_dir.mkdir(parents=True, exist_ok=True)
-        self.new_checkpoint_dir = Path(
-            f"./checkpoints/{self.run_id}/{datetime.now().strftime('%d-%m-%Y_%H-%M-%S')}")
+        self.new_checkpoint_dir = Path(f"./checkpoints/{datetime.now().strftime('%d-%b-%Y_%H-%M-%S')}_{self.run_id}/")
         self.new_checkpoint_dir.mkdir(parents=True, exist_ok=True)
         with open(f"{self.new_checkpoint_dir}/config.json", 'w') as f:
-            json.dump({"run_name": run_name, "send_to_wandb": send_to_wandb,
-                       "id_resume": self.run_id, "hyperparameters": hyperparameters}, f)
+            json.dump(
+                {
+                    "run_name": run_name, "send_to_wandb": send_to_wandb,
+                    "id_resume": self.run_id, "hyperparameters": hyperparameters
+                }, f
+            )
 
     def log(self, data, step):
         if self.send_to_wandb:
@@ -303,9 +329,11 @@ def train(
     print("DEVICE", device)
     model.to(device)
     train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=bs, shuffle=True)
+        train_dataset, batch_size=bs, shuffle=True
+    )
     eval_dataloader = torch.utils.data.DataLoader(
-        eval_dataset, batch_size=bs, shuffle=True)
+        eval_dataset, batch_size=bs, shuffle=True
+    )
     for i in range(epochs_from, epochs_to + 1):
         model.train()
         train_loss = 0
@@ -326,11 +354,17 @@ def train(
                 val_loss += single_loss
             print(f'TRAIN: epoch: {i},  loss: {train_loss.item()}')
             print(f'VAL: epoch: {i},  val loss: {val_loss.item()} \n')
-            logger.log({"train loss": train_loss.item(),
-                        "val loss": val_loss.item()}, i)
+            logger.log(
+                {
+                    "train loss": train_loss.item(),
+                    "val loss": val_loss.item()
+                }, i
+            )
         if i % save_freq == 0:
-            torch.save(model.state_dict(),
-                       f"{logger.new_checkpoint_dir}/{i}_epochs")
+            torch.save(
+                model.state_dict(),
+                f"{logger.new_checkpoint_dir}/{i}_epochs"
+            )
 
 
 if __name__ == '__main__':

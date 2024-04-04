@@ -49,8 +49,8 @@ if __name__ == '__main__':
     SEND_TO_WANDB = True
 
     #### BEGIN: Load model and init Logger
-    model = SeqToSeqGru(encoder_input_length=LOOKBACK_WINDOW_SIZE, decoder_input_length=PREDICTION_SIZE)
-    model.load_state_dict(torch.load('././checkpoints/faab98ah/03-04-2024_15-46-05/1700_epochs'))
+    model = SeqToSeqGru(encoder_input_length=LOOKBACK_WINDOW_SIZE, decoder_input_length=PREDICTION_SIZE, decoder_hidden_dim=140)
+    model.load_state_dict(torch.load('./checkpoints/04-Apr-2024_14-25-34_r46ycq3s/2600_epochs'))
 
     # checkpoint_path = './checkpoints/M3BBAG/02-04-2024_14-41-40/6000_epochs'
     checkpoint_path = None
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, id_resume=run_id,
                         hyperparameters=hyperparameters)
     else:
-        logger = Logger("finetune decoder-only-lstm", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
+        logger = Logger("finetune (3,10)", send_to_wandb=SEND_TO_WANDB, hyperparameters=hyperparameters)
     ### END
 
     loss_function = torch.nn.MSELoss()
@@ -85,6 +85,6 @@ if __name__ == '__main__':
         epochs_to=EPOCH_TO,
         loss_function=loss_function,
         logger=logger,
-        save_freq=10
+        save_freq=20
     )
     logger.finish()
