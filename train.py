@@ -1,4 +1,3 @@
-# Encode h0 = cat(signal, fft(signal)) and use GRUCell(h0) autoregressively in both train and inference
 import torch
 from torch.utils.data import Dataset
 
