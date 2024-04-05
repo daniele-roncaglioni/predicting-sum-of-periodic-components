@@ -1,4 +1,4 @@
-# Predicting a signal composed of a finite set of harmonics
+# Predicting sums of many periodic components
 
 The goal of this small project was to see how easy or difficult it is to predict a signal made up of a significant amount of harmonics. I randomly generate a set of amplitudes, periods and phases, sum them together to obtain a synthetic signal. I then train a model to predict the composite signal. Obviously training a NN to predict one component is easy, but how about a signal with 40-ish components?
 
